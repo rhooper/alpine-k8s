@@ -90,7 +90,7 @@ curl -s https://kubernetes.io/releases/ | (
   if [[ -x "$(which html2text)" ]]; then
     html2text -nobs
   else
-    docker run -ti --rm -v $(pwd):/app alpine/html2text -nobs
+    docker run -i --rm -v $(pwd):/app alpine/html2text -nobs
   fi
 ) |
    awk -F '[ :]' '/Latest Release:/ { print $3 }' |
