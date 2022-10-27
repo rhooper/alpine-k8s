@@ -9,6 +9,8 @@
 
 set -e
 
+trap 'export -p' 0
+
 GREP=grep
 
 setup() {
@@ -21,24 +23,24 @@ setup() {
     # jq 1.6
     curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o jq
     chmod +x jq
-    PATH=".:$PATH"
+    JQ="$(pwd)/jq"
   fi
 }
 
 build() {
 
   # helm latest
-  helm="$(curl -s https://api.github.com/repos/helm/helm/releases/latest | jq -r '.tag_name | .[1:]')"
+  helm="$(curl -s https://api.github.com/repos/helm/helm/releases/latest | $JQ -r '.tag_name | .[1:]')"
   echo "helm version is $helm"
 
   # kustomize latest
-  kustomize_release=$(curl -s https://api.github.com/repos/kubernetes-sigs/kustomize/releases | jq -r '.[].tag_name | select(contains("kustomize"))' \
+  kustomize_release=$(curl -s https://api.github.com/repos/kubernetes-sigs/kustomize/releases | $JQ -r '.[].tag_name | select(contains("kustomize"))' \
     | sort -rV | head -n 1)
   kustomize_version=$(basename ${kustomize_release})
   echo "kustomize version is $kustomize_version"
 
   # kubeseal latest
-  kubeseal_version=$(curl -s https://api.github.com/repos/bitnami-labs/sealed-secrets/releases | jq -r '.[].tag_name | select(startswith("v"))' \
+  kubeseal_version=$(curl -s https://api.github.com/repos/bitnami-labs/sealed-secrets/releases | $JQ -r '.[].tag_name | select(startswith("v"))' \
     | sort -rV | head -n 1 |sed 's/v//')
   echo "kubeseal version is $kubeseal_version"
 
