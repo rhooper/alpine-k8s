@@ -13,20 +13,6 @@ trap 'export -p' 0
 
 GREP=grep
 
-setup() {
-  if [[ "$(uname -s)" == "Darwin" ]]; then
-    GREP=$(which ggrep) || brew install grep && GREP=$(which ggrep)
-    JQ=$(which jq) || brew install jq
-  fi
-
-  if [[ "$(uname -s)" == "Linux" ]] && [ ! -x ./jq ]; then
-    # jq 1.6
-    curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o jq
-    chmod +x jq
-    JQ="$(pwd)/jq"
-  fi
-}
-
 build() {
 
   # helm latest
@@ -77,7 +63,17 @@ build() {
 
 [[ -f "$(dirname $0)/.env" ]] && echo loading .env && source "$(dirname $0)/.env"
 
-setup()
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  GREP=$(which ggrep) || brew install grep && GREP=$(which ggrep)
+  JQ=$(which jq) || brew install jq
+fi
+
+if [[ "$(uname -s)" == "Linux" ]] && [ ! -x ./jq ]; then
+  # jq 1.6
+  curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o jq
+  chmod +x jq
+  JQ="$(pwd)/jq"
+fi
 
 # Construct docker hub path from env if unset
 if [[ -z "$DOCKER_IMAGE_PATH" ]]; then
@@ -88,7 +84,6 @@ else
   image=$DOCKER_IMAGE_PATH
 fi
 echo "Docker repository is $image"
-
 
 curl -s https://kubernetes.io/releases/ | (
   if [[ -x "$(which html2text)" ]]; then
