@@ -77,6 +77,8 @@ build() {
 
 [[ -f "$(dirname $0)/.env" ]] && echo loading .env && source "$(dirname $0)/.env"
 
+setup()
+
 # Construct docker hub path from env if unset
 if [[ -z "$DOCKER_IMAGE_PATH" ]]; then
   CIRCLE_REPOSITORY_URL=${CIRCLE_REPOSITORY_URL-$(git remote get-url origin)}
