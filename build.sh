@@ -9,26 +9,27 @@
 
 set -e
 
-build() {
-  GREP=grep
+GREP=grep
 
+setup() {
   if [[ "$(uname -s)" == "Darwin" ]]; then
     GREP=$(which ggrep) || brew install grep && GREP=$(which ggrep)
+    JQ=$(which jq) || brew install jq
   fi
 
-  # helm latest
-  helm=$(curl -s https://github.com/helm/helm/releases)
-  helm=$(echo $helm\" | ${GREP} -oP '(?<=tag\/v)[0-9][^"]*'|grep -v \-|sort -Vr|head -1)
-  echo "helm version is $helm"
-
-  # jq 1.6
-  DEBIAN_FRONTEND=noninteractive
-  #sudo apt-get update && sudo apt-get -q -y install jq
   if [[ "$(uname -s)" == "Linux" ]] && [ ! -x ./jq ]; then
+    # jq 1.6
     curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o jq
     chmod +x jq
     PATH=".:$PATH"
   fi
+}
+
+build() {
+
+  # helm latest
+  helm="$(curl -s https://api.github.com/repos/helm/helm/releases/latest | jq -r '.tag_name | .[1:]')"
+  echo "helm version is $helm"
 
   # kustomize latest
   kustomize_release=$(curl -s https://api.github.com/repos/kubernetes-sigs/kustomize/releases | jq -r '.[].tag_name | select(contains("kustomize"))' \
@@ -55,11 +56,11 @@ build() {
     --build-arg HELM_VERSION=${helm} \
     --build-arg KUSTOMIZE_VERSION=${kustomize_version} \
     --build-arg KUBESEAL_VERSION=${kubeseal_version} \
+    --output normal --progress normal \
     -t ${image}:${tag} ${buildx_extra_args[@]} .
   docker buildx rm alpine-k8s
 
   # run test
-  echo "Detected Helm3+"
   version=$(docker run --rm ${image}:${tag} helm version)
   # version.BuildInfo{Version:"v3.6.3", GitCommit:"d506314abfb5d21419df8c7e7e68012379db2354", GitTreeState:"clean", GoVersion:"go1.16.5"}
 
@@ -70,19 +71,34 @@ build() {
     echo "unmatched"
     exit
   fi
-
-
 }
 
-image="alpine/k8s"
-curl -s https://kubernetes.io/releases/ > release.html
+[[ -f "$(dirname $0)/.env" ]] && echo loading .env && source "$(dirname $0)/.env"
 
-docker run -ti --rm -v $(pwd):/app bwits/html2txt  /app/release.html /app/release.txt
-awk -F "[: ]" '/released:/{print $3}' release.txt | while read tag
+# Construct docker hub path from env if unset
+if [[ -z "$DOCKER_IMAGE_PATH" ]]; then
+  CIRCLE_REPOSITORY_URL=${CIRCLE_REPOSITORY_URL-$(git remote get-url origin)}
+  image="${CIRCLE_REPOSITORY_URL//.git}"
+  image="${image/*:/}"
+else
+  image=$DOCKER_IMAGE_PATH
+fi
+echo "Docker repository is $image"
+
+
+curl -s https://kubernetes.io/releases/ | (
+  if [[ -x "$(which html2text)" ]]; then
+    html2text -nobs
+  else
+    docker run -ti --rm -v $(pwd):/app alpine/html2text -nobs
+  fi
+) |
+   awk -F '[ :]' '/Latest Release:/ { print $3 }' |
+  while read tag
 do
-  echo ${tag}
-  status=$(curl -sL https://hub.docker.com/v2/repositories/${image}/tags/${tag})
-  echo $status
+  echo "Building ${image}/${tag}"
+  status=$(curl -sL "https://hub.docker.com/v2/repositories/${image}/tags/${tag}")
+  echo "$status"
   if [[ ( "${status}" =~ "not found" ) || ( ${REBUILD} == "true" ) ]]; then
      build
   fi

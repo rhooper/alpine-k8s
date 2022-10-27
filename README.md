@@ -54,6 +54,12 @@ export REBUILD=true
 bash ./build.sh
 ```
 
+If you are building on MacOS, install dependencies with:
+
+```
+brew install jq grep html2text
+```
+
 ### Weekly build
 
 Automation build job runs weekly by Circle CI Pipeline.
